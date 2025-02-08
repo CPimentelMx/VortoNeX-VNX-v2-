@@ -1,0 +1,38 @@
+Some aspects to consider:
+
+-For better comprehension of the current code, it is recommended to be involved with both related previous developments: 
+1) The Full Multi-wake Vortex Lattice Method (Pimentel, 2021; code: MultiVLM), 
+2) The Unsteady Full Multi-wake Vortex Lattice Method (UFVLM, 2022; code: UMultiVLM), and 
+3) The Full Nonlinear Vortex Tube-Vorton Method (Pimentel, 2023; code: VortoNeX).
+
+-There are ten (10) predefined meshes available (one of them is commented), which were generated in the GiD's preprocessor.
+
+-The parameter Phi (first capital letter) is related to the total wake length. Since for the sphere case a massively detached flow is expected, 
+ small values must be used (e.g. 0.1, 0.01, etc.). On the other hand, the parameter phi (in lower case) is related to the length of the first 
+ wake row. Large values will throw the first layer of vortons far downstream, deforming the grid severely. A unitary value is suggested, which 
+ is also related to a unitary Courant number.
+
+-Parameter "tolerance radius" avoids obtaining an overshooted induced velocity between two close calculation points (vorton-node or 
+ vorton-vorton). However, small values such as the default one (1e-6) work fine due to the well-behaved regularization functions used 
+ (the cut-off model is not implemented).
+
+-Parameter "tolerance vorticity" avoids division by zero in the variable volume scheme for the vortex stretching calculation; however, 
+ higher values than the default one (1e-6) could be explored in order to avoid some instability issues (under certain conditions, some 
+ vortons tend to overgrow).
+
+-Until now, it has been assumed that viscous solutions can be performed through the current method since it can be numerically  
+ justified by obtaining a zero residual through the Core Spreading Method (CSM; a similar scheme as in Strickland, 2002); however, such 
+ a condition must be proved numerically as the current development evolves. From a theoretical point of view, it could be debatable to consider 
+ the current scheme as valid since it is supposed that the diffusion of vorticity through the viscosity 'would' only be applied to non-conservative 
+ fields, whereas the current ones are perfectly conservative (circulation and vorticity). So, does circulation also need to be corrected (and 
+ compensated to maintain stability) for a non-conservative field?
+
+-The "aero_coef.dat" output file has no headers (for easy manipulation in Excel, for example); all values correspond to the unsteady solution. 
+ The values for CL (lift), CD (drag) and CY (lateral) appear in such an order.
+
+-Unlike the previous code (VortoNeX v1), no divergence-free field is enforced, corresponding to the "scheme 2"; such a scheme would be solving 
+ the compressible case.   
+
+If you have more questions, please do not hesitate to contact me via e-mail: pimentel_garcia@yahoo.com.mx
+
+This file will be eventually updated as needed.
