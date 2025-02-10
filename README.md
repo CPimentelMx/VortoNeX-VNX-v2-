@@ -1,4 +1,4 @@
-# VortoNeX-VNX-v2
+# VortoNeX_v2
 The Full Nonlinear Vortex Tube-Vorton Method (FTVM; Pimentel, 2023) applied to a THICK body.
 
 The concept of inviscid detached vorticity from the entire surface leads to the next generation CFD!
