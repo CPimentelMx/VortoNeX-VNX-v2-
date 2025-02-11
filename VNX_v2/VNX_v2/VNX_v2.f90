@@ -1,16 +1,21 @@
 !***********************************************************************************************************************************************************
 !  CODE: VortoNeX (VNX) - The Full Non-linear Vortex Tube-Vorton Method (FTVM)                                                                             !
 !  PURPOSE: to solve detached flow/fluid past a closed body (sphere)                                                                                       !
-!  VERSION: 2.0 (released: February-2025)                                                                                                                  !
+!  VERSION: 2.01 (released: February-2025)                                                                                                                  !
 !  AUTHOR AND DEVELOPER: Jesús Carlos Pimentel García (JCPG)                                                                                               !
-!  CONTACT: pimentel_garcia@yahoo.com.mx                                                                                                                   !                                                                                                                   !
+!  CONTACT: pimentel_garcia@yahoo.com.mx                                                                                                                   !
 !                                                                                                                                                          !
 !  Note: Since the main objective of the current code is to explicitly show the procedure used to apply the original FTVM concepts to solve a thick body,  !
 !        some aspects such as simplification, optimization, and robustness are left for future development. Of course, the current code (and its concepts) !
 !        can be modified/improved/extended for non-commercial purposes; however, the licensee or licensor reserves the right to claim for future           !
 !        commercial uses based on the protection under an international patent application:                                                                ! 
-!        "Full-surface detached vorticity method and system to solve fluid dynamics", International patent application: WO/2024/136634,       !
-!        World Intellectual Property Organization (2024). https://patentscope.wipo.int/search/en/detail.jsf?docId=WO2024136634&_cid=P21-LXXE19-45988-1     !                  
+!        "Full-surface detached vorticity method and system to solve fluid dynamics", International patent application: WO/2024/136634,                    !
+!        World Intellectual Property Organization (2024). https://patentscope.wipo.int/search/en/detail.jsf?docId=WO2024136634&_cid=P21-LXXE19-45988-1     !    
+!                                                                                                                                                          !              
+!  Control version:                                                                                                                                        !
+!       v2.0:  Implements a simplified solid angle calculation (in subroutine: V2_COUPLING_BODY).                                                           !
+!       v2.01: Implements a precise solid angle calculation (based on 3 position vectors of the triangular element).                                        !
+!              Such a modification does not affect the flow solution but slightly to pressure and force calculations.                                      !
 !***********************************************************************************************************************************************************
     
 Program VNX2 ! Vorton-Next (generation); JCPG
@@ -134,12 +139,13 @@ End Subroutine GEOM
 
 Subroutine V2_COUPLING_BODY( circ, j, point ) ! generates the body's influence coefficient matrix (ICM) for the multi-vorton scheme (V2); JCPG
     Use ARRAYS, only : pr,ctrl_pts,nor_vec,A_body,grid,rhs,A_solv,bound_circ,vdir,input,tan_vec1,tan_vec2,area,bound_circ_old,deriv_gamma,rhs_freeflow,solid_angle
-    Use MATH, only : DOTPRODUCT,VECTORNORM
+    Use MATH, only : DOTPRODUCT,VECTORNORM,CROSSPRODUCT
     Implicit none
     integer :: i,op
     integer, intent(out) :: j
     real(kind=pr), intent(out) :: circ,point(3)
     real(kind=pr) :: vind_ring(3),pco(3),geometry(10),equiv_vcr,dist
+    real(kind=pr) :: r_pa(3),r_pb(3),r_pc(3),norm_r_pa,norm_r_pb,norm_r_pc,rpb_x_rpc(3)
     
     allocate(ctrl_pts(3,grid%nelem),nor_vec(3,grid%nelem),A_body(grid%nelem,grid%nelem),rhs(grid%nelem),tan_vec1(3,grid%nelem),tan_vec2(3,grid%nelem), area(grid%nelem),rhs_freeflow(grid%nelem))
     
@@ -156,17 +162,38 @@ Subroutine V2_COUPLING_BODY( circ, j, point ) ! generates the body's influence c
         area(i)       = geometry(10)  ! panel's area
     end do
     
-    ! new lines for solid angles calculation
+    !!!! MATLAB code: "Solid Angle of a Triangle"; Author: Ayad Al-Rumaithi
+    !function omega=Solid_Angle_Triangle(p,va,vb,vc)
+        !r_pa=p-va; norm_r_pa=norm(r_pa); r_pb=p-vb; norm_r_pb=norm(r_pb); r_pc=p-vc; norm_r_pc=norm(r_pc);
+        !omega=2*atan2(dot(r_pa,cross(r_pb,r_pc)),norm_r_pa*norm_r_pb*norm_r_pc+dot(r_pa,r_pb)*norm_r_pc+dot(r_pa,r_pc)*norm_r_pb+dot(r_pb,r_pc)*norm_r_pa);
+    !end
+    !!!!
+    
+    ! new lines for precise solid angles calculation
     do i=1, grid%nelem ! on control points
         do j=1, grid%nelem ! on panels
-            if (i/=j) then
-                call VECTORNORM (ctrl_pts(:,j)-ctrl_pts(:,i), dist) ! distance between control points
-                solid_angle(i,j) = area(j)/(dist*dist) ! solid angle
-            else ! (i==j)
-                solid_angle(i,j) = 0._pr ! if the point is the same
-            end if
+            r_pa(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(1,j)) ! first vector
+            r_pb(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(2,j)) ! second vector
+            r_pc(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(3,j)) ! third vector
+            call VECTORNORM (r_pa(:), norm_r_pa) ! first vector's norm
+            call VECTORNORM (r_pb(:), norm_r_pb) ! second vector's norm
+            call VECTORNORM (r_pc(:), norm_r_pc) ! third vector's norm
+            call CROSSPRODUCT (r_pb(:),r_pc(:),rpb_x_rpc(:)) ! cross product between second and third vectors
+            solid_angle(i,j) = 2._pr * atan2(dot_product(r_pa,rpb_x_rpc), norm_r_pa*norm_r_pb*norm_r_pc + dot_product(r_pa,r_pb)*norm_r_pc + dot_product(r_pa,r_pc)*norm_r_pb + dot_product(r_pb,r_pc)*norm_r_pa) ! precise solid angle
         end do
     end do
+    
+    !! new lines for solid angles calculation (old version: v2.0)
+    !do i=1, grid%nelem ! on control points
+    !    do j=1, grid%nelem ! on panels
+    !        if (i/=j) then
+    !            call VECTORNORM (ctrl_pts(:,j)-ctrl_pts(:,i), dist) ! distance between control points
+    !            solid_angle(i,j) = area(j)/(dist*dist) ! solid angle
+    !        else ! (i==j)
+    !            solid_angle(i,j) = 0._pr ! if the point is the same
+    !        end if
+    !    end do
+    !end do
     
     ! lines deleted for total area calculation
 
