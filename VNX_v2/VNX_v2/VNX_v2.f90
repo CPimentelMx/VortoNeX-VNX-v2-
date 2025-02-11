@@ -1,7 +1,7 @@
 !***********************************************************************************************************************************************************
 !  CODE: VortoNeX (VNX) - The Full Non-linear Vortex Tube-Vorton Method (FTVM)                                                                             !
 !  PURPOSE: to solve detached flow/fluid past a closed body (sphere)                                                                                       !
-!  VERSION: 2.01 (released: February-2025)                                                                                                                  !
+!  VERSION: 2.02 (released: February-2025)                                                                                                                 !
 !  AUTHOR AND DEVELOPER: Jesús Carlos Pimentel García (JCPG)                                                                                               !
 !  CONTACT: pimentel_garcia@yahoo.com.mx                                                                                                                   !
 !                                                                                                                                                          !
@@ -13,9 +13,10 @@
 !        World Intellectual Property Organization (2024). https://patentscope.wipo.int/search/en/detail.jsf?docId=WO2024136634&_cid=P21-LXXE19-45988-1     !    
 !                                                                                                                                                          !              
 !  Control version:                                                                                                                                        !
-!       v2.0:  Implements a simplified solid angle calculation (in subroutine: V2_COUPLING_BODY).                                                           !
-!       v2.01: Implements a precise solid angle calculation (based on 3 position vectors of the triangular element).                                        !
+!       v2.0:  Implements a simplified solid angle calculation (in subroutine: V2_COUPLING_BODY).                                                          !
+!       v2.01: Implements a precise solid angle calculation (based on 3 position vectors of the triangular element).                                       !
 !              Such a modification does not affect the flow solution but slightly to pressure and force calculations.                                      !
+!       v2.02: Avoids negative solid angles (by inverting the search direction of the triangular elements' nodes).                                         !
 !***********************************************************************************************************************************************************
     
 Program VNX2 ! Vorton-Next (generation); JCPG
@@ -172,14 +173,14 @@ Subroutine V2_COUPLING_BODY( circ, j, point ) ! generates the body's influence c
     ! new lines for precise solid angles calculation
     do i=1, grid%nelem ! on control points
         do j=1, grid%nelem ! on panels
-            r_pa(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(1,j)) ! first vector
+            r_pa(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(3,j)) ! first vector
             r_pb(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(2,j)) ! second vector
-            r_pc(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(3,j)) ! third vector
+            r_pc(:) = ctrl_pts(:,i) - grid%coord(:,grid%panel(1,j)) ! third vector
             call VECTORNORM (r_pa(:), norm_r_pa) ! first vector's norm
             call VECTORNORM (r_pb(:), norm_r_pb) ! second vector's norm
             call VECTORNORM (r_pc(:), norm_r_pc) ! third vector's norm
             call CROSSPRODUCT (r_pb(:),r_pc(:),rpb_x_rpc(:)) ! cross product between second and third vectors
-            solid_angle(i,j) = 2._pr * atan2(dot_product(r_pa,rpb_x_rpc), norm_r_pa*norm_r_pb*norm_r_pc + dot_product(r_pa,r_pb)*norm_r_pc + dot_product(r_pa,r_pc)*norm_r_pb + dot_product(r_pb,r_pc)*norm_r_pa) ! precise solid angle
+            solid_angle(i,j) = 2._pr * atan2(dot_product(r_pa,rpb_x_rpc), norm_r_pa*norm_r_pb*norm_r_pc + dot_product(r_pa,r_pb)*norm_r_pc + dot_product(r_pa,r_pc)*norm_r_pb + dot_product(r_pb,r_pc)*norm_r_pa) ! precise solid angle (minus to avoid a negative solid angle)
         end do
     end do
     
